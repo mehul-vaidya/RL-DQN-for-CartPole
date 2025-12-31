@@ -63,41 +63,73 @@ def select_action(state):
 def store_experience(s, a, r, s_next, done):
     memory.append((s, a, r, s_next, done))
 
+# def train_step():
+#     #“If I don’t have enough past experiences, don’t learn yet.”
+#     if len(memory) < batch_size:
+#         return
+#
+#     #“Let me review random memories from my diary.”
+#     batch = random.sample(memory, batch_size)
+#     states, actions, rewards, next_states, dones = zip(*batch)
+#
+#     #Convert memories into tensors
+#     states = torch.FloatTensor(states).to(device)
+#     actions = torch.LongTensor(actions).unsqueeze(1).to(device)
+#     rewards = torch.FloatTensor(rewards).unsqueeze(1).to(device)
+#     next_states = torch.FloatTensor(next_states).to(device)
+#     dones = torch.FloatTensor(dones).unsqueeze(1).to(device)
+#
+#     #Brain predicts Q-values for all actions
+#     #Select only the actions actually taken
+#     current_q = policy_net(states).gather(1, actions)
+#
+#     #Teacher brain estimates best future reward
+#     #Picks maximum action value
+#     next_q = target_net(next_states).max(1)[0].unsqueeze(1)
+#
+#     #“Actual outcome = treat now + possible treats later.”
+#     target_q = rewards + gamma * next_q * (1 - dones)
+#
+#     #Measure mistake (loss)
+#     loss = nn.MSELoss()(current_q, target_q)
+#
+#     #“Change my brain slightly so I’m less wrong next time.”
+#     optimizer.zero_grad()
+#     loss.backward()
+#     optimizer.step()
+
+#Double DQN training
 def train_step():
-    #“If I don’t have enough past experiences, don’t learn yet.”
     if len(memory) < batch_size:
         return
 
-    #“Let me review random memories from my diary.”
     batch = random.sample(memory, batch_size)
     states, actions, rewards, next_states, dones = zip(*batch)
 
-    #Convert memories into tensors
     states = torch.FloatTensor(states).to(device)
     actions = torch.LongTensor(actions).unsqueeze(1).to(device)
     rewards = torch.FloatTensor(rewards).unsqueeze(1).to(device)
     next_states = torch.FloatTensor(next_states).to(device)
     dones = torch.FloatTensor(dones).unsqueeze(1).to(device)
 
-    #Brain predicts Q-values for all actions
-    #Select only the actions actually taken
+    # Q(s,a) from policy network
     current_q = policy_net(states).gather(1, actions)
 
-    #Teacher brain estimates best future reward
-    #Picks maximum action value
-    next_q = target_net(next_states).max(1)[0].unsqueeze(1)
+    # 🔥 DOUBLE DQN CORE 🔥
+    # 1️⃣ Policy network chooses best next action
+    next_actions = torch.argmax(policy_net(next_states), dim=1).unsqueeze(1)
 
-    #“Actual outcome = treat now + possible treats later.”
+    # 2️⃣ Target network evaluates that action
+    next_q = target_net(next_states).gather(1, next_actions)
+
+    # Target Q-value
     target_q = rewards + gamma * next_q * (1 - dones)
 
-    #Measure mistake (loss)
     loss = nn.MSELoss()(current_q, target_q)
 
-    #“Change my brain slightly so I’m less wrong next time.”
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-
 #----------------------------------------Training Loop--------------------------------------
 #training loop
 for episode in range(episodes): #Loop over episodes (training days)
